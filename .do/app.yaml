@@ -1,0 +1,8 @@
+name: HackTech-FrontEnd
+services:
+- dockerfile_path: Dockerfile
+  github:
+    branch: main
+    deploy_on_push: true
+    repo: WeihongCen/HackTech-FrontEnd
+  name: HackTech-FrontEnd

@@ -5,11 +5,14 @@ import requests
 from supabase import create_client
 import asyncio
 from typing import AsyncGenerator
-from chat import call_flask_query
+from dotenv import load_dotenv
+import os
+load_dotenv()
 
 
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
-SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SERVER_URL = os.getenv("SERVER_URL")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 TABLES = ["material_master", 
           "stock_levels",
@@ -21,6 +24,23 @@ TABLES = ["material_master",
           "specs",
           ]
 
+
+def call_flask_query(user_input: str) -> str:
+    try:
+        response = requests.post(
+            f"{SERVER_URL}/query",
+            json={"user_input": user_input},
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        if data.get("status") == "success":
+            return str(data.get("response"))
+        else:
+            return f"Error: {data.get('error', 'Unknown error')}"
+    except Exception as e:
+        return f"Request failed: {str(e)}"
+    
 
 def to_sync_generator(async_gen: AsyncGenerator):
     while True:
@@ -64,7 +84,7 @@ with st.sidebar:
     if uploaded_files:
         if st.button("Upload"):
             files = [('files', (file.name, file.getvalue())) for file in uploaded_files]
-            file_response = requests.post("http://localhost:5000/upload", files=files)
+            file_response = requests.post(f"{SERVER_URL}/upload", files=files)
 
             if file_response.status_code == 200:
                 st.success("Files uploaded successfully!")

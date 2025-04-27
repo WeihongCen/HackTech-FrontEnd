@@ -78,7 +78,7 @@ with st.sidebar:
     uploaded_files = st.file_uploader(
         "Upload files to automatically populate the database", 
         accept_multiple_files=True,
-        type=["pdf", "csv", "txt", "eml"]
+        type=["csv", "txt", "eml"]
     )
 
     if uploaded_files:

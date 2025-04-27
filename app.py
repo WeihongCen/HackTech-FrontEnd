@@ -3,7 +3,32 @@ import streamlit as st
 import pandas as pd
 import requests
 from supabase import create_client
-from chat import database_agent
+import asyncio
+from typing import AsyncGenerator
+from chat import call_flask_query
+
+
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+TABLES = ["material_master", 
+          "stock_levels",
+          "stock_movements",
+          "dispatch_parameters", 
+          "material_orders", 
+          "sales_orders", 
+          "suppliers",
+          "specs",
+          ]
+
+
+def to_sync_generator(async_gen: AsyncGenerator):
+    while True:
+        try:
+            yield asyncio.run(anext(async_gen))
+        except StopAsyncIteration:
+            break
+
 
 st.set_page_config(layout="wide")
 with st.sidebar:
@@ -12,26 +37,13 @@ with st.sidebar:
     # =========================================================================================
     st.header("📊 Database Viewer")
 
-    SUPABASE_URL = st.secrets["SUPABASE_URL"]
-    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-    tables = ["material_master", 
-              "stock_levels",
-              "stock_movements",
-              "dispatch_parameters", 
-              "material_orders", 
-              "sales_orders", 
-              "suppliers",
-              "specs",
-              ]
-
-    selected_table = st.selectbox("Choose a table", tables)
+    selected_table = st.selectbox("Choose a table", TABLES)
 
     if selected_table:
         try:
-            response = supabase.table(selected_table).select("*").limit(100).execute()
-            if response.data:
-                df = pd.DataFrame(response.data)
+            table_response = supabase.table(selected_table).select("*").limit(100).execute()
+            if table_response.data:
+                df = pd.DataFrame(table_response.data)
                 st.dataframe(df)
             else:
                 st.info(f"No data in table {selected_table}.")
@@ -52,12 +64,12 @@ with st.sidebar:
     if uploaded_files:
         if st.button("Upload"):
             files = [('files', (file.name, file.getvalue())) for file in uploaded_files]
-            response = requests.post("http://localhost:5000/upload", files=files)
+            file_response = requests.post("http://localhost:5000/upload", files=files)
 
-            if response.status_code == 200:
+            if file_response.status_code == 200:
                 st.success("Files uploaded successfully!")
             else:
-                st.error(f"Upload failed: {response.text}")
+                st.error(f"Upload failed: {file_response.text}")
 
 # =========================================================================================
 # Chat
@@ -77,7 +89,25 @@ if prompt := st.chat_input("Ask Hugo about your data."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
+    
     with st.chat_message("assistant"):
-        # response = st.write_stream(database_agent(prompt))
-        response = st.markdown(database_agent(prompt))
-    st.session_state.messages.append({"role": "assistant", "content": response})
+        placeholder = st.empty()
+
+        async def animate_loading():
+            dots = ["", ".", "..", "..."]
+            i = 0
+            while not st.session_state.get("response_ready", False):
+                placeholder.markdown(f"Hugo is thinking{dots[i % 4]}")
+                i += 1
+                await asyncio.sleep(0.2)
+
+        async def wait_hugo():
+            loading_task = asyncio.create_task(animate_loading())
+            server_response = call_flask_query(prompt)
+            st.session_state["response_ready"] = True
+            await loading_task
+            placeholder.markdown(server_response)
+            st.session_state.messages.append({"role": "assistant", "content": server_response})
+
+        st.session_state["response_ready"] = False
+        asyncio.run(wait_hugo())

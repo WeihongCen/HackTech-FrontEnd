@@ -61,7 +61,7 @@ with st.sidebar:
 
     if selected_table:
         try:
-            table_response = supabase.table(selected_table).select("*").limit(100).execute()
+            table_response = supabase.table(selected_table).select("*").execute()
             if table_response.data:
                 df = pd.DataFrame(table_response.data)
                 st.dataframe(df)

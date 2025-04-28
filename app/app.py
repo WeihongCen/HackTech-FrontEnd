@@ -94,18 +94,31 @@ with st.sidebar:
 # =========================================================================================
 # Chat
 # =========================================================================================
-st.header("🤖 Hugo")
-
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Display chat messages from history on app rerun
+if "preset_prompt" not in st.session_state:
+    st.session_state.preset_prompt = ""
+
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Accept user input
-if prompt := st.chat_input("Ask Hugo about your data."):
+if len(st.session_state.messages) == 0:
+    suggested_prompts = [
+        "Which parts are low in stock?",
+        "Who is my most reliable supplier?",
+        "How many Voltway S1 V1 Standard can we produce?",
+    ]
+
+    with st.container():
+        for i, suggestion in enumerate(suggested_prompts):
+            if st.button(suggestion, key=suggestion):
+                st.session_state.preset_prompt = suggestion
+
+user_prompt = st.chat_input("Ask Hugo about your data.")
+if user_prompt or st.session_state.preset_prompt:
+    prompt = user_prompt or st.session_state.preset_prompt
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)

@@ -119,6 +119,7 @@ if len(st.session_state.messages) == 0:
 user_prompt = st.chat_input("Ask Hugo about your data.")
 if user_prompt or st.session_state.preset_prompt:
     prompt = user_prompt or st.session_state.preset_prompt
+    st.session_state.preset_prompt = ""
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
